@@ -2,6 +2,7 @@
 
 (require "desugar.rkt")
 (require "cps.rkt")
+(require "closure-convert.rkt")
 (require "utils.rkt")
 (require "top-level.rkt")
 (require "compile.rkt")

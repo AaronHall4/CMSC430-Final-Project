@@ -250,9 +250,10 @@
        x]
       [`(lambda ,(? symbol? x) ,e)
        (define k (gensym 'kont))
-       `(lambda ,x (let ([,k (prim car ,x)])
-                     (let ([,x (prim cdr ,x)])
-                       ,(T-e e k))))]
+       (define x+ (gensym x))
+       `(lambda ,x+ (let ([,k (prim car ,x+)])
+                      (let ([,x (prim cdr ,x+)])
+                        ,(T-e e k))))]
       [`(lambda (,(? symbol? xs) ...) ,e)
        (define k (gensym 'kont))
        `(lambda ,(cons k xs) ,(T-e e k))]

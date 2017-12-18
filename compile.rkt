@@ -6,7 +6,11 @@
 (require "closure-convert.rkt")
 (require "utils.rkt")
 
-(provide test-compiler)
+(provide compile-to-cps
+         compile-to-cc
+         compile-to-llvm
+         compile-to-binary
+         test-compiler)
 
 ; Various paths used for compilation.
 (define project-path (current-directory))
@@ -21,6 +25,12 @@
     (if (file-exists? clang++-path-submit-server)
         clang++-path-submit-server
         "clang++")))
+
+(define (compile-to-cps prog)
+  (cps-convert (anf-convert (alphatize (assignment-convert (simplify-ir (desugar (top-level prog))))))))
+
+(define (compile-to-cc prog)
+  (closure-convert (cps-convert (anf-convert (alphatize (assignment-convert (simplify-ir (desugar (top-level prog)))))))))
 
 ; Compile a Scheme program from the top level all the way down to LLVM.
 (define (compile-to-llvm prog)
@@ -44,7 +54,7 @@
 (define (test-compiler prog)
   (define tl-val (eval-top-level prog))
   (define prog-llvm (compile-to-llvm prog))
-  (define llvm-val (eval-llvm prog))
+  (define llvm-val (eval-llvm prog-llvm))
   (if (equal? tl-val llvm-val)
       #t
       (begin

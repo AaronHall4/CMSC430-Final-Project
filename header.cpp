@@ -371,7 +371,7 @@ GEN_EXPECT2ARGLIST(applyprim_vector_45ref, prim_vector_45ref)
 u64 prim_vector_45set_33(u64 a, u64 i, u64 v)
 {
     ASSERT_TAG(i, INT_TAG, "second argument to vector-ref must be an integer")
-    ASSERT_TAG(a, OTHER_TAG, "first argument to vector-ref must be an integer")
+    ASSERT_TAG(a, OTHER_TAG, "first argument to vector-ref must be a vector")
 
     if ((((u64*)DECODE_OTHER(a))[0]&7) != VECTOR_OTHERTAG)
         fatal_err("vector-ref not given a properly formed vector");
@@ -382,6 +382,30 @@ u64 prim_vector_45set_33(u64 a, u64 i, u64 v)
     return V_VOID;
 }
 GEN_EXPECT3ARGLIST(applyprim_vector_45set_33, prim_vector_45set_33)
+
+u64 prim_vector_45length(u64 a)
+{
+    ASSERT_TAG(a, OTHER_TAG, "first argument to vector-length must be a vector")
+    
+    if ((((u64*)DECODE_OTHER(a))[0]&7) != VECTOR_OTHERTAG)
+        fatal_err("vector-length not given a properly formed vector");
+    
+    return ENCODE_INT(((u64*)DECODE_OTHER(a))[0] >> 3);
+}
+GEN_EXPECT1ARGLIST(applyprim_vector_45length, prim_vector_45length)
+
+u64 prim_vector_63(u64 a)
+{
+    if ((a & 7) == OTHER_TAG) {
+        if ((((u64*)DECODE_OTHER(a))[0]&7) == VECTOR_OTHERTAG)
+            return V_TRUE;
+        else
+            return V_FALSE;
+    } else {
+        return V_FALSE;
+    }
+}
+GEN_EXPECT1ARGLIST(applyprim_vector_63, prim_vector_63)
 
 
 ///// void, ...
@@ -420,13 +444,15 @@ u64 prim_eqv_63(u64 a, u64 b)
 }
 GEN_EXPECT2ARGLIST(applyprim_eqv_63, prim_eqv_63)
 
-/*
+
 u64 prim_equal_63(u64 a, u64 b)
 {
-    return 0;
+    if (a == b)
+        return V_TRUE;
+    else
+        return V_FALSE;
 }
 GEN_EXPECT2ARGLIST(applyprim_equal_63, prim_equal_63)
-*/
 
 
 ///// Other predicates
