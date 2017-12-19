@@ -28,7 +28,11 @@
          test-closure-convert
          test-proc->llvm)
 
-
+; Various paths used for compilation.
+(provide project-path
+         libgc-path
+         gc-include-path
+         clang++-path)
 (define project-path (current-directory))
 (define libgc-path
   (path->string
@@ -36,7 +40,6 @@
 (define gc-include-path
   (path->string
    (build-path project-path "lib" "local" "include")))
-
 (define clang++-path
   (let ([clang++-path-submit-server "/opt/llvm-3.9.0/bin/clang++"])
     (if (file-exists? clang++-path-submit-server)
@@ -675,10 +678,7 @@
               (rewrite-match `(match ,e0 ,@clauses (,pat0 ,@es) (else (raise "no match"))))]
       [`(,e0 . ,es) (cons (rewrite-match e0) (rewrite-match es))]
       [else e]))
-  ; Exceptions for which the compiler halts with an error message should be given an appropriate handler.
-  (with-handlers ([exn:fail:contract:divide-by-zero? (lambda (x) "fatal error: division by zero")]
-                  [exn:fail:contract? (lambda (x) "fatal error: cannot apply non-procedure value")]
-                  [exn:fail? (lambda (x) (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print e) (error 'eval-fail))])
+  (with-handlers ([exn:fail? (lambda (x) (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print e) (error 'eval-fail))])
     (parameterize ([current-namespace (make-base-namespace)])
       (namespace-require 'rnrs)
       (namespace-require 'racket)
@@ -688,7 +688,11 @@
                          (define (halt x) (exit+ x))
                          (define (prim op . args) (apply op args))
                          (define (apply-prim op args) (apply op args))
-                         ,(rewrite-match e))))))))
+                         ; Exceptions for which the compiler halts with an error message should be given an appropriate handler.
+                         (guard (e [(exn:fail:contract:divide-by-zero? e) "fatal error: division by zero"]
+                                   [(exn:fail:contract? e) "fatal error: cannot apply non-procedure value"]
+                                   [else "uncaught exception"])
+                                ,(rewrite-match e)))))))))
 
 
 

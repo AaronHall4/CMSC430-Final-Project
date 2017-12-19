@@ -5,3 +5,5 @@ Runtime errors:
       goes over the 256 MB limit.
     - Applying non-function value. Wrote a assert_is_clo() function that ensures that an object is a closure
       before calling the function associated with it.
+    - Uncaught runtime exception. Surrounded the output of eval-top-level with a guard that prints an error message 
+      if an uncaught exception is raised.

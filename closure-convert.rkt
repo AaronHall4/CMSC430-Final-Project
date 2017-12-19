@@ -17,6 +17,7 @@
 
 ; Whether to optimize vararg conversion using static analysis (0-cfa) results
 (define optimize-varargs #t)
+(define 0-cfa-timeout 1000)
 
 
 ; Pass that removes lambdas and datums as atomic and forces them to be let-bound
@@ -194,7 +195,7 @@
     (if (and (equal? graph graph+)
              (equal? store store+))
         (cons graph+ store+)
-        (if (> (- (current-milliseconds) start-ms) 8000)
+        (if (> (- (current-milliseconds) start-ms) 0-cfa-timeout)
             (begin #;(pretty-print '0-cfa-timed-out)
                    (cons #f #f))
             (loop graph+ store+)))))

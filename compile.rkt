@@ -12,20 +12,6 @@
          compile-to-binary
          test-compiler)
 
-; Various paths used for compilation.
-(define project-path (current-directory))
-(define libgc-path
-  (path->string
-   (build-path project-path "lib" "local" "lib" "libgc.a")))
-(define gc-include-path
-  (path->string
-   (build-path project-path "lib" "local" "include")))
-(define clang++-path
-  (let ([clang++-path-submit-server "/opt/llvm-3.9.0/bin/clang++"])
-    (if (file-exists? clang++-path-submit-server)
-        clang++-path-submit-server
-        "clang++")))
-
 (define (compile-to-cps prog)
   (cps-convert (anf-convert (alphatize (assignment-convert (simplify-ir (desugar (top-level prog))))))))
 

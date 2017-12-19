@@ -30,23 +30,23 @@
 
 (define (convert-cond-clauses ccs)
   (map (lambda (cc) (match cc
-                      [`(,e) `(,(top-level e))]
+                      [`(,e) `(,(top-level-aux e))]
                       [`(,e0 ,e1 ,e2s ...)
                        (define begin-e1s (wrap-elist (cons e1 e2s)))
-                       `(,(top-level e0) ,(top-level begin-e1s))]
+                       `(,(top-level-aux e0) ,(top-level-aux begin-e1s))]
                       [`(else ,e0 ,e1s ...)
                        (define begin-e0s (wrap-elist (cons e0 e1s)))
-                       `(else ,(top-level begin-e0s))]
+                       `(else ,(top-level-aux begin-e0s))]
                       [else (raise "Error: invalid cond clause")])) ccs))
 
 (define (convert-case-clauses ccs)
   (map (lambda (cc) (match cc
                       [`((,(? datum? dats) ...) ,e0 ,e1s ...)
                        (define begin-e0s (wrap-elist (cons e0 e1s)))
-                       `(,dats ,(top-level begin-e0s))]
+                       `(,dats ,(top-level-aux begin-e0s))]
                       [`(else ,e0 ,e1s ...)
                        (define begin-e0s (wrap-elist (cons e0 e1s)))
-                       `(else ,(top-level begin-e0s))]
+                       `(else ,(top-level-aux begin-e0s))]
                       [else (raise "Error: invalid case clause")])) ccs))
 
 (define (flatten-begins begin-es)
@@ -169,7 +169,7 @@
                            ''() ; `(e e ...)
                            (convert-quasiquote innerqq1 nqqs nuqs)))]))])) ; `(e ... . e)
 
-(define (top-level e)
+(define (top-level-aux e)
   (match e
     [`(define ,(? symbol? x) ,e)
      (raise "Error: unexpected define")]
@@ -180,37 +180,37 @@
 
     [`(letrec* ([,(? symbol? xs) ,e0s] ...) ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     (define e0s+ (map top-level e0s))
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     (define e0s+ (map top-level-aux e0s))
      `(letrec* ,(zip-args xs e0s+) ,begin-e1s+)]
     [`(letrec ([,(? symbol? xs) ,e0s] ...) ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     (define e0s+ (map top-level e0s))
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     (define e0s+ (map top-level-aux e0s))
      `(letrec ,(zip-args xs e0s+) ,begin-e1s+)]
     [`(let* ([,(? symbol? xs) ,e0s] ...) ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     (define e0s+ (map top-level e0s))
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     (define e0s+ (map top-level-aux e0s))
      `(let* ,(zip-args xs e0s+) ,begin-e1s+)]
     [`(let ([,(? symbol? xs) ,e0s] ...) ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     (define e0s+ (map top-level e0s))
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     (define e0s+ (map top-level-aux e0s))
      `(let ,(zip-args xs e0s+) ,begin-e1s+)]
     [`(let ,(? symbol? x0) ([,(? symbol? x1s) ,e0s] ...) ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     (define e0s+ (map top-level e0s))
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     (define e0s+ (map top-level-aux e0s))
      `(let ,x0 ,(zip-args x1s e0s+) ,begin-e1s+)]
 
     [`(lambda (,(? symbol? x0s) ..1 . ,(? symbol? x1)) ,es ..1)
      (define begin-es (wrap-elist es))
-     (define begin-es+ (top-level begin-es))
+     (define begin-es+ (top-level-aux begin-es))
      `(lambda (,@x0s . ,x1) ,begin-es+)]
     [`(lambda (,(? symbol? x0s) ... (,(? symbol? defxs) ,defes) ...) ,es ..1)
      (define begin-es (wrap-elist es))
-     (define begin-es+ (top-level begin-es))
+     (define begin-es+ (top-level-aux begin-es))
      (define defvar (gensym 'defaults))
      (define (initdefs xlist elist)
        (if (null? xlist)
@@ -221,33 +221,33 @@
               ,(initdefs (cdr xlist) (cdr elist)))))
      (if (null? defxs)
          `(lambda ,x0s ,begin-es+)
-         (top-level `(lambda (,@x0s . ,defvar)
-                       (when (> (length ,defvar) ,(length defxs))
-                         (raise "Error: too many arguments passed"))
-                       (let ,(zip-args defxs defes)
-                         ,(initdefs defxs defes)
-                         ,@es))))]
+         (top-level-aux `(lambda (,@x0s . ,defvar)
+                           (when (> (length ,defvar) ,(length defxs))
+                             (raise "Error: too many arguments passed"))
+                           (let ,(zip-args defxs defes)
+                             ,(initdefs defxs defes)
+                             ,@es))))]
     [`(lambda ,(? symbol? x) ,es ..1)
      (define begin-es (wrap-elist es))
-     (define begin-es+ (top-level begin-es))
+     (define begin-es+ (top-level-aux begin-es))
      `(lambda ,x ,begin-es+)]
 
     [`(call/cc ,e)
-     `(call/cc ,(top-level e))]
+     `(call/cc ,(top-level-aux e))]
     [`(dynamic-wind ,e0 ,e1 ,e2)
-     `(dynamic-wind ,(top-level e0) ,(top-level e1) ,(top-level e2))]
+     `(dynamic-wind ,(top-level-aux e0) ,(top-level-aux e1) ,(top-level-aux e2))]
     [`(guard (,(? symbol? x) ,ccs ...) ,es ..1)
      (define converted-ccs (convert-cond-clauses ccs))
      (define begin-es (wrap-elist es))
-     (define begin-es+ (top-level begin-es))
+     (define begin-es+ (top-level-aux begin-es))
      `(guard (,x ,@converted-ccs) ,begin-es+)]
     [`(raise ,e)
-     `(raise ,(top-level e))]
+     `(raise ,(top-level-aux e))]
 
     [`(delay ,e)
-     `(delay ,(top-level e))]
+     `(delay ,(top-level-aux e))]
     [`(force ,e)
-     `(force ,(top-level e))]
+     `(force ,(top-level-aux e))]
 
     [`(match ,e ,mcs ...)
      (define (is-else? mc)
@@ -259,38 +259,38 @@
      (define cond-clauses+ (if (member #t (map is-else? mcs))
                                cond-clauses
                                (append cond-clauses (list '[else (raise "Error: no match")]))))
-     (top-level `(let ([,matchvar ,e]) (cond ,@cond-clauses+)))]
+     (top-level-aux `(let ([,matchvar ,e]) (cond ,@cond-clauses+)))]
 
     [`(and ,es ...)
-     `(and ,@(map top-level es))]
+     `(and ,@(map top-level-aux es))]
     [`(or ,es)
-     `(or ,@(map top-level es))]
+     `(or ,@(map top-level-aux es))]
 
     [`(cond ,ccs ...)
      `(cond ,@(convert-cond-clauses ccs))]
     [`(case ,e ,ccs ...)
-     `(case ,(top-level e) ,@(convert-case-clauses ccs))]
+     `(case ,(top-level-aux e) ,@(convert-case-clauses ccs))]
 
     [`(if ,e0 ,e1 ,e2)
-     `(if ,(top-level e0) ,(top-level e1) ,(top-level e2))]
+     `(if ,(top-level-aux e0) ,(top-level-aux e1) ,(top-level-aux e2))]
     [`(when ,e0 ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     `(when ,(top-level e0) ,begin-e1s+)]
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     `(when ,(top-level-aux e0) ,begin-e1s+)]
     [`(unless ,e0 ,e1s ..1)
      (define begin-e1s (wrap-elist e1s))
-     (define begin-e1s+ (top-level begin-e1s))
-     `(unless ,(top-level e0) ,begin-e1s+)]
+     (define begin-e1s+ (top-level-aux begin-e1s))
+     `(unless ,(top-level-aux e0) ,begin-e1s+)]
 
     [`(set! ,(? symbol? x) ,e)
-     `(set! ,x ,(top-level e))]
+     `(set! ,x ,(top-level-aux e))]
 
     [`(begin ,es ..1)
      (define es+ (flatten-begins es))
      (define es++ (convert-defines es+))
      (if (equal? (car es++) 'begin)
-         `(begin ,@(map top-level (cdr es++)))
-         (top-level es++))]
+         `(begin ,@(map top-level-aux (cdr es++)))
+         (top-level-aux es++))]
 
     [(? symbol? x)
      x]
@@ -298,7 +298,7 @@
      op]
 
     [`(quasiquote ,qq)
-     (top-level (convert-quasiquote qq 1 0))]
+     (top-level-aux (convert-quasiquote qq 1 0))]
     [`(quote ,(? datum? dat))
      `(quote ,dat)]
 
@@ -312,9 +312,12 @@
      `(quote #f)]
 
     [`(apply ,e0 ,e1)
-     `(apply ,(top-level e0) ,(top-level e1))]
+     `(apply ,(top-level-aux e0) ,(top-level-aux e1))]
     [`(,e0 ,e1s ...)
-     `(,(top-level e0) ,@(map top-level e1s))]))
+     `(,(top-level-aux e0) ,@(map top-level-aux e1s))]))
+
+(define (top-level e)
+  `(guard (e [else '"uncaught exception"]) ,(top-level-aux e)))
 
 ; I, Aaron Hall, pledge on my honor that I have not given or received any
 ; unauthorized assistance on this assignment.
