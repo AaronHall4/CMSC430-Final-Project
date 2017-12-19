@@ -6,7 +6,8 @@
 #include "stdint.h"
 #include "string.h"
 
-#define USE_GC 1     // Comment this line to disable garbage collection.
+#define USE_GC 1            // Comment this line to disable garbage collection.
+#define MEM_CAP 268435456   // Memory cap of 256 MB.
 
 #define GC_PTR_TAG 0
 #define INT_TAG 1
@@ -127,13 +128,22 @@ typedef int64_t s64;
 typedef uint32_t u32;
 typedef int32_t s32;
 
+u64 prim_halt(u64);
 
     
 // UTILS
 
-
 u64* alloc(const u64 m)
 {
+    static u64 mem_usage = 0;
+    mem_usage += m;
+    if (mem_usage > MEM_CAP) {
+        const char *errstrconst = "fatal error: memory limit exceeded";
+        char *errstr = (char *) calloc(1, strlen(errstrconst) + 1);    // Using calloc instead of GC_MALLOC here because it's simpler and
+        strcpy(errstr, errstrconst);                                   // the program will terminate anyway.
+        prim_halt(ENCODE_STR(errstr));
+    }
+
     #ifdef USE_GC
         return (u64*) GC_MALLOC(m);
     #else

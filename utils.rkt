@@ -1,5 +1,6 @@
 #lang racket
 
+(require racket/sandbox)
 
 (provide prim? reserved? prims->list
          c-name
@@ -187,7 +188,10 @@
 
 
 (define (eval-top-level e)
-  (racket-compile-eval e))
+  ; Do the evaluation with a memory cap of 256 megabytes, to test
+  ; the memory capping abilities of the compiler.
+  (with-handlers ([exn:fail:resource? (lambda (x) "fatal error: memory limit exceeded")])
+    (with-limits #f 256 (racket-compile-eval e))))
 
 
 
@@ -671,7 +675,9 @@
               (rewrite-match `(match ,e0 ,@clauses (,pat0 ,@es) (else (raise "no match"))))]
       [`(,e0 . ,es) (cons (rewrite-match e0) (rewrite-match es))]
       [else e]))
+  ; Exceptions for which the compiler halts with an error message should be given an appropriate handler.
   (with-handlers ([exn:fail:contract:divide-by-zero? (lambda (x) "fatal error: division by zero")]
+                  [exn:fail:contract? (lambda (x) "fatal error: cannot apply non-procedure value")]
                   [exn:fail? (lambda (x) (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print e) (error 'eval-fail))])
     (parameterize ([current-namespace (make-base-namespace)])
       (namespace-require 'rnrs)
