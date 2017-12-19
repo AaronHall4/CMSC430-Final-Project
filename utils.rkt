@@ -43,14 +43,14 @@
         "clang++")))
 
 (define prims-list '(= > < <= >= + - * / 
-                     cons? null? cons car cdr list first second third fourth fifth last
-                     length list-tail drop drop-right take member memv map append foldl foldr
-                     vector? vector make-vector vector-ref vector-set! vector-length
-                     set set->list list->set set-add set-union set-count set-first set-rest set-remove
-                     hash hash-ref hash-set hash-count hash-keys hash-has-key? hash?
-                     list? void? promise? procedure? number? integer?
-                     error void print display write exit halt
-                     eq? eqv? equal? not))
+                       cons? null? cons car cdr list first second third fourth fifth last
+                       length list-tail drop drop-right take member memv map append foldl foldr
+                       vector? vector make-vector vector-ref vector-set! vector-length
+                       set set->list list->set set-add set-union set-count set-first set-rest set-remove
+                       hash hash-ref hash-set hash-count hash-keys hash-has-key? hash?
+                       list? void? promise? procedure? number? integer?
+                       error void print display write exit halt
+                       eq? eqv? equal? not))
 (define ok-set (list->set (string->list "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$")))
 (define (c-name s)
   (foldr string-append
@@ -71,8 +71,8 @@
       #f))
 
 (define reserved-list '(letrec letrec* let let* if and or set! quote begin
-                               cond case when unless delay force dynamic-wind
-                               raise guard call/cc prim apply-prim))
+                         cond case when unless delay force dynamic-wind
+                         raise guard call/cc prim apply-prim))
 (define (reserved? id)
   (if (member id reserved-list)
       #t
@@ -80,14 +80,14 @@
 
 (define (datum? d)
   (match d
-         [`#(,(? datum?) ...) #t]
-         [`(,(? datum?) ...) #t]
-         [(cons datum? datum?) #t]
-         [(? string?) #t]
-         [(? integer?) #t]
-         [(? symbol?) #t]
-         [(? boolean?) #t]
-         [else (pretty-print `(bad-datum ,d)) #f]))
+    [`#(,(? datum?) ...) #t]
+    [`(,(? datum?) ...) #t]
+    [(cons datum? datum?) #t]
+    [(? string?) #t]
+    [(? integer?) #t]
+    [(? symbol?) #t]
+    [(? boolean?) #t]
+    [else (pretty-print `(bad-datum ,d)) #f]))
 
 
 (define (read-all [port (current-input-port)])
@@ -116,73 +116,73 @@
              (improper-args? (cdr args)))))
   (define (cond-clause? cls) 
     (match cls
-           [`(,(? (rec/with env))) #t]
-           [`(,(? (rec/with env)) ,(? (rec/with env))) #t]
-           [else #f]))
+      [`(,(? (rec/with env))) #t]
+      [`(,(? (rec/with env)) ,(? (rec/with env))) #t]
+      [else #f]))
   (define (case-clause? cls) 
     (match cls
-           [`((,(? datum?) ...) ,(? (rec/with env))) #t]
-           [else #f]))
+      [`((,(? datum?) ...) ,(? (rec/with env))) #t]
+      [else #f]))
   (match e
-         [`(letrec* ([,(? var? xs) ,es] ...) ,e0)
-          (and (no-duplicates? xs)
-               (andmap (rec/with (ext env xs))
-                       (cons e0 es)))]
-         [`(letrec ([,(? var? xs) ,es] ...) ,e0)
-          (and (no-duplicates? xs)
-               (andmap (rec/with (ext env xs))
-                       (cons e0 es)))]
+    [`(letrec* ([,(? var? xs) ,es] ...) ,e0)
+     (and (no-duplicates? xs)
+          (andmap (rec/with (ext env xs))
+                  (cons e0 es)))]
+    [`(letrec ([,(? var? xs) ,es] ...) ,e0)
+     (and (no-duplicates? xs)
+          (andmap (rec/with (ext env xs))
+                  (cons e0 es)))]
          
-         [`(let* () ,e0)
-          ((rec/with env) e0)]
-         [`(let* ([,x ,e0]) ,e1)
-          ((rec/with env) `(let ([,x ,e0]) ,e1))]
-         [`(let* ([,x ,e0] . ,rest) ,e1)
-          ((rec/with env) `(let ([,x ,e0]) (let* ,rest ,e1)))]
+    [`(let* () ,e0)
+     ((rec/with env) e0)]
+    [`(let* ([,x ,e0]) ,e1)
+     ((rec/with env) `(let ([,x ,e0]) ,e1))]
+    [`(let* ([,x ,e0] . ,rest) ,e1)
+     ((rec/with env) `(let ([,x ,e0]) (let* ,rest ,e1)))]
          
-         [`(let ([,(? symbol? xs) ,(? (rec/with env) es)] ...) ,e0)
-          (and (no-duplicates? xs)
-               ((rec/with (ext env xs)) e0))]
-         [`(let ,(? var? lp)  ([,xs ,es] ...) ,e0)
-          ((rec/with env) `(letrec ([,lp (lambda ,xs ,e0)]) (,lp . ,es)))]
+    [`(let ([,(? symbol? xs) ,(? (rec/with env) es)] ...) ,e0)
+     (and (no-duplicates? xs)
+          ((rec/with (ext env xs)) e0))]
+    [`(let ,(? var? lp)  ([,xs ,es] ...) ,e0)
+     ((rec/with env) `(letrec ([,lp (lambda ,xs ,e0)]) (,lp . ,es)))]
          
-         [`(lambda (,(? var? xs) ...) ,e0)
-          (and (no-duplicates? xs)
-               ((rec/with (ext env xs)) e0))]
-         [`(lambda ,(? var? x) ,e0)
-          ((rec/with (ext env (list x))) e0)]
-         [`(lambda ,(? improper-args? args) ,e0)
-          (and (no-duplicates? (flatten args))
-               ((rec/with (ext env (flatten args))) e0))]
+    [`(lambda (,(? var? xs) ...) ,e0)
+     (and (no-duplicates? xs)
+          ((rec/with (ext env xs)) e0))]
+    [`(lambda ,(? var? x) ,e0)
+     ((rec/with (ext env (list x))) e0)]
+    [`(lambda ,(? improper-args? args) ,e0)
+     (and (no-duplicates? (flatten args))
+          ((rec/with (ext env (flatten args))) e0))]
          
-         [`(delay ,(? (rec/with env))) #t]
-         [`(force ,(? (rec/with env))) #t]
-         [`(guard (,(? symbol? x) ,clauses ...) ,(? (rec/with env)))
-          (scheme-exp? `(cond . ,clauses) (ext env (list x)))]
-         [`(raise ,(? (rec/with env))) #t]
-         [`(dynamic-wind ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(cond ,(? cond-clause?) ...) #t]
-         [`(cond ,(? cond-clause?) ... (else ,(? (rec/with env)))) #t]
-         [`(case ,(? (rec/with env)) ,(? case-clause?) ...) #t]
-         [`(case ,(? (rec/with env)) ,(? case-clause?) ... (else ,(? (rec/with env)))) #t]
-         [`(and ,(? (rec/with env)) ...) #t]
-         [`(or ,(? (rec/with env)) ...) #t]
-         [`(when ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(unless ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(if ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(set! ,(? symbol?) ,(? (rec/with env))) #t]
-         [`(begin ,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
-         [`(call/cc ,(? (rec/with env))) #t]
-         [`(let/cc ,(? symbol? x) ,eb) ((rec/with (ext env (list x))) eb)]
+    [`(delay ,(? (rec/with env))) #t]
+    [`(force ,(? (rec/with env))) #t]
+    [`(guard (,(? symbol? x) ,clauses ...) ,(? (rec/with env)))
+     (scheme-exp? `(cond . ,clauses) (ext env (list x)))]
+    [`(raise ,(? (rec/with env))) #t]
+    [`(dynamic-wind ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(cond ,(? cond-clause?) ...) #t]
+    [`(cond ,(? cond-clause?) ... (else ,(? (rec/with env)))) #t]
+    [`(case ,(? (rec/with env)) ,(? case-clause?) ...) #t]
+    [`(case ,(? (rec/with env)) ,(? case-clause?) ... (else ,(? (rec/with env)))) #t]
+    [`(and ,(? (rec/with env)) ...) #t]
+    [`(or ,(? (rec/with env)) ...) #t]
+    [`(when ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(unless ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(if ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(set! ,(? symbol?) ,(? (rec/with env))) #t]
+    [`(begin ,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
+    [`(call/cc ,(? (rec/with env))) #t]
+    [`(let/cc ,(? symbol? x) ,eb) ((rec/with (ext env (list x))) eb)]
 
-         [(? var? x) (if (set-member? env x) #t (prim? x))]
-         [`(quote ,(? datum?)) #t]
+    [(? var? x) (if (set-member? env x) #t (prim? x))]
+    [`(quote ,(? datum?)) #t]
 
-         [`(,(? prim?) ,(? (rec/with env)) ...) #t]
-         [`(apply ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
+    [`(,(? prim?) ,(? (rec/with env)) ...) #t]
+    [`(apply ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
 
-         [else (pretty-print `(bad-scheme ,e ,env)) #f]))
+    [else (pretty-print `(bad-scheme ,e ,env)) #f]))
 
 
 
@@ -234,99 +234,99 @@
   (define (ext env lst)
     (set-union env (list->set lst)))
   (match e
-         [`(let ([,(? var? xs) ,(? (rec/with env) es)] ...) ,e0)
-          (and (no-duplicates? xs)
-               ((rec/with (ext env xs)) e0))]
-         [`(lambda (,(? var? xs) ...) ,e0)
-          (and (no-duplicates? xs)
-               ((rec/with (ext env xs)) e0))]
-         [`(lambda ,(? var? x) ,e0)
-          ((rec/with (ext env (list x))) e0)]
-         [`(apply ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(if ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
-         [`(set! ,(? symbol?) ,(? (rec/with env))) #t]
-         [`(call/cc ,(? (rec/with env))) #t]
-         [(? var? x) (if (set-member? env x) #t #f)]
-         [`(quote ,(? datum?)) #t]
-         [`(prim ,(? prim?) ,(? (rec/with env)) ...) #t]
-         [`(apply-prim ,(? prim?) ,(? (rec/with env))) #t]
-         [`(,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
-         [else (pretty-print `(bad-ir ,e ,env)) #f]))
+    [`(let ([,(? var? xs) ,(? (rec/with env) es)] ...) ,e0)
+     (and (no-duplicates? xs)
+          ((rec/with (ext env xs)) e0))]
+    [`(lambda (,(? var? xs) ...) ,e0)
+     (and (no-duplicates? xs)
+          ((rec/with (ext env xs)) e0))]
+    [`(lambda ,(? var? x) ,e0)
+     ((rec/with (ext env (list x))) e0)]
+    [`(apply ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(if ,(? (rec/with env)) ,(? (rec/with env)) ,(? (rec/with env))) #t]
+    [`(set! ,(? symbol?) ,(? (rec/with env))) #t]
+    [`(call/cc ,(? (rec/with env))) #t]
+    [(? var? x) (if (set-member? env x) #t #f)]
+    [`(quote ,(? datum?)) #t]
+    [`(prim ,(? prim?) ,(? (rec/with env)) ...) #t]
+    [`(apply-prim ,(? prim?) ,(? (rec/with env))) #t]
+    [`(,(? (rec/with env)) ,(? (rec/with env)) ...) #t]
+    [else (pretty-print `(bad-ir ,e ,env)) #f]))
 
 
 (define (simplify-ir ir-e)
   (define (T e)
     (match e
-           [`(let ([,xs ,es] ...) ,e0)
-            `(let ,(map list xs (map T es)) ,(T e0))]
-           [`(lambda ,xs ,e0)
-            `(lambda ,xs ,(T e0))]
-           [`(apply ,e0 ,e1)
-            `(apply ,(T e0) ,(T e1))]
-           [`(if ,e0 ,e1 ,e2)
-            `(if ,(T e0) ,(T e1) ,(T e2))]
-           [`(set! ,x ,e0)
-            `(set! ,x ,(T e0))]
-           [`(call/cc ,e0)
-            `(call/cc ,(T e0))]
-           [(? symbol? x)
-            x]
-           [`(quote ,(? symbol? x))
-            `(quote ,x)]
-           [`(quote #(,ds ...))
-            (T `(prim vector ,@(map (lambda (d) `',d) ds)))]
-           [`(quote ,(? list? lst))
-            (T `(prim list ,@(map (lambda (d) `',d) lst)))]
-           [`(quote ,other)
-            `(quote ,other)]
+      [`(let ([,xs ,es] ...) ,e0)
+       `(let ,(map list xs (map T es)) ,(T e0))]
+      [`(lambda ,xs ,e0)
+       `(lambda ,xs ,(T e0))]
+      [`(apply ,e0 ,e1)
+       `(apply ,(T e0) ,(T e1))]
+      [`(if ,e0 ,e1 ,e2)
+       `(if ,(T e0) ,(T e1) ,(T e2))]
+      [`(set! ,x ,e0)
+       `(set! ,x ,(T e0))]
+      [`(call/cc ,e0)
+       `(call/cc ,(T e0))]
+      [(? symbol? x)
+       x]
+      [`(quote ,(? symbol? x))
+       `(quote ,x)]
+      [`(quote #(,ds ...))
+       (T `(prim vector ,@(map (lambda (d) `',d) ds)))]
+      [`(quote ,(? list? lst))
+       (T `(prim list ,@(map (lambda (d) `',d) lst)))]
+      [`(quote ,other)
+       `(quote ,other)]
            
-           [`(prim +)
-            ''0]
-           [`(prim + ,e0)
-            (T e0)]
-           [`(prim + ,e0 ,e1 ,e2 ,es ...)
-            (T `(prim + ,e0 (prim + ,e1 ,e2 ,@es)))]
-           [`(prim *)
-            ''1]
-           [`(prim * ,e0)
-            (T e0)]
-           [`(prim * ,e0 ,e1 ,e2 ,es ...)
-            (T `(prim * ,e0 (prim * ,e1 ,e2 ,@es)))]
-           [`(prim - ,e0 ,es ...)
-            #:when (> (length es) 1)
-            (T `(prim - (prim - ,e0 ,@(drop-right es 1)) ,(last es)))]
-           [`(prim / ,e0 ,e1)
-            `(prim / ,(T e0) ,(T e1))]
+      [`(prim +)
+       ''0]
+      [`(prim + ,e0)
+       (T e0)]
+      [`(prim + ,e0 ,e1 ,e2 ,es ...)
+       (T `(prim + ,e0 (prim + ,e1 ,e2 ,@es)))]
+      [`(prim *)
+       ''1]
+      [`(prim * ,e0)
+       (T e0)]
+      [`(prim * ,e0 ,e1 ,e2 ,es ...)
+       (T `(prim * ,e0 (prim * ,e1 ,e2 ,@es)))]
+      [`(prim - ,e0 ,es ...)
+       #:when (> (length es) 1)
+       (T `(prim - (prim - ,e0 ,@(drop-right es 1)) ,(last es)))]
+      [`(prim / ,e0 ,e1)
+       `(prim / ,(T e0) ,(T e1))]
 
-           ; Remove list, vector->apply vector, map foldl, foldr, drop, memv, >, >=, ...
-           [`(prim list ,es ...) ; optimize 
-            `((lambda lst lst) ,@(map T es))]
-           [`(apply-prim list ,e0)
-            (T e0)]
-           [`(prim vector ,es ...)
-            (T `((lambda el (apply-prim vector el)) ,@es))]
-           [`(prim foldl ,e0 ,e1 ,e2)
-            `(%foldl1 ,@(map T (list e0 e1 e2)))]
-           [`(prim foldr ,e0 ,e1 ,e2)
-            `(%foldr1 ,@(map T (list e0 e1 e2)))]
-           [`(prim map ,e0 ,e1)
-            `(%map1 ,@(map T (list e0 e1)))]
+      ; Remove list, vector->apply vector, map foldl, foldr, drop, memv, >, >=, ...
+      [`(prim list ,es ...) ; optimize 
+       `((lambda lst lst) ,@(map T es))]
+      [`(apply-prim list ,e0)
+       (T e0)]
+      [`(prim vector ,es ...)
+       (T `((lambda el (apply-prim vector el)) ,@es))]
+      [`(prim foldl ,e0 ,e1 ,e2)
+       `(%foldl1 ,@(map T (list e0 e1 e2)))]
+      [`(prim foldr ,e0 ,e1 ,e2)
+       `(%foldr1 ,@(map T (list e0 e1 e2)))]
+      [`(prim map ,e0 ,e1)
+       `(%map1 ,@(map T (list e0 e1)))]
 
-           [`(prim ,op ,es ...)
-            #:when (member op '(drop memv / > >= list? take drop length append last
-                                     map foldl foldr first second third fourth fifth))
-            `(,(string->symbol (string-append "%" (symbol->string op))) ,@(map T es))]
-           [`(apply-prim ,op ,e0)
-            #:when (member op '(drop memv / > >= list? take drop length append last
-                                     map foldl foldr first second third fourth fifth))
-            `(apply ,(string->symbol (string-append "%" (symbol->string op))) ,(T e0))]
+      [`(prim ,op ,es ...)
+       #:when (member op '(drop memv / > >= list? take drop length append last
+                                map foldl foldr first second third fourth fifth))
+       `(,(string->symbol (string-append "%" (symbol->string op))) ,@(map T es))]
+      [`(apply-prim ,op ,e0)
+       #:when (member op '(drop memv / > >= list? take drop length append last
+                                map foldl foldr first second third fourth fifth))
+       `(apply ,(string->symbol (string-append "%" (symbol->string op))) ,(T e0))]
                       
-           [`(prim ,op ,es ...)
-            `(prim ,op ,@(map T es))]
-           [`(apply-prim ,op ,e0)
-            `(apply-prim ,op ,(T e0))]
-           [`(,ef ,es ...)
-            `(,(T ef) ,@(map T es))]))
+      [`(prim ,op ,es ...)
+       `(prim ,op ,@(map T es))]
+      [`(apply-prim ,op ,e0)
+       `(apply-prim ,op ,(T e0))]
+      [`(,ef ,es ...)
+       `(,(T ef) ,@(map T es))]))
   `(let ([Ycmb
           ((lambda (yu) (yu yu))
            (lambda (y) (lambda (f) (f (lambda args (apply ((y y) f) args))))))])
@@ -339,12 +339,12 @@
                      (f (prim car lst)
                         (%foldr1 f acc (prim cdr lst)))))))]
            [%map1 (Ycmb (lambda (%map) (lambda (f lst) (if (prim null? lst)
-                                                                    '()
-                                                                    (prim cons (f (prim car lst))
-                                                                               (%map f (prim cdr lst)))))))]
+                                                           '()
+                                                           (prim cons (f (prim car lst))
+                                                                 (%map f (prim cdr lst)))))))]
            [%take
             (Ycmb (lambda (%take) (lambda (lst n) (if (prim = n '0) '() (if (prim null? lst) '()
-                                    (prim cons (prim car lst) (%take (prim cdr lst) (prim - n '1))))))))]
+                                                                            (prim cons (prim car lst) (%take (prim cdr lst) (prim - n '1))))))))]
            [%length (Ycmb (lambda (%length) (lambda (lst) (if (prim null? lst) '0 (prim + '1 (%length (prim cdr lst)))))))]
            [%foldl1
             (Ycmb
@@ -359,18 +359,18 @@
               (Ycmb
                (lambda (%foldr)
                  (lambda args
-                    (let ([f (prim car args)]
-                          [acc (prim car (prim cdr args))]
-                          [lsts (prim cdr (prim cdr args))])
-                      (if (%foldr1 (lambda (lst b) (if b b (prim null? lst))) '#f lsts)
-                          acc
-                          (let ([lsts+ (%map1 (lambda (x) (prim cdr x)) lsts)]
-                                [vs (%map1 (lambda (x) (prim car x)) lsts)])
-                            (apply f (%foldr1 (lambda (a b) (prim cons a b))
-                                              (prim cons
-                                                    (apply %foldr (prim cons f (prim cons acc lsts+)))
-                                                    '())
-                                              vs))))))))])
+                   (let ([f (prim car args)]
+                         [acc (prim car (prim cdr args))]
+                         [lsts (prim cdr (prim cdr args))])
+                     (if (%foldr1 (lambda (lst b) (if b b (prim null? lst))) '#f lsts)
+                         acc
+                         (let ([lsts+ (%map1 (lambda (x) (prim cdr x)) lsts)]
+                               [vs (%map1 (lambda (x) (prim car x)) lsts)])
+                           (apply f (%foldr1 (lambda (a b) (prim cons a b))
+                                             (prim cons
+                                                   (apply %foldr (prim cons f (prim cons acc lsts+)))
+                                                   '())
+                                             vs))))))))])
          (let ([%map1
                 (lambda (f lst)
                   (%foldr1 (lambda (v r) (prim cons (f v) r)) '() lst))]
@@ -486,25 +486,25 @@
     (set-union env (list->set lst)))
   (define (alpha? e)
     (match e
-         [`(let ([,(? not-seen-var? xs) ,(? alpha? es)] ...) ,e0)
-          (and (no-duplicates? xs)
-               (alpha? e0))]
-         [`(lambda (,(? not-seen-var? xs) ...) ,e0)
-          (and (no-duplicates? xs)
-               (alpha? e0))]
-         [`(lambda ,(? not-seen-var? x) ,e0)
-          (alpha? e0)]
-         [`(apply ,(? alpha?) ,(? alpha?)) #t]
-         [`(if ,(? alpha?) ,(? alpha?) ,(? alpha?)) #t]
-         [`(call/cc ,(? alpha?)) #t]
-         [(? var? x) #t]
-         [`(quote ,(? datum?)) #t]
-         [`(prim ,(? prim?) ,(? alpha?) ...) #t]
-         [`(apply-prim ,(? prim?) ,(? alpha?)) #t]
-         [`(,(? (and/c (not/c (lambda (x) (member x '(let lambda apply if call/cc quote prim quote-prim))))
-                       alpha?))
-            ,(? alpha?) ...) #t]
-         [else (pretty-print `(bad-alphatized ,e)) #f]))
+      [`(let ([,(? not-seen-var? xs) ,(? alpha? es)] ...) ,e0)
+       (and (no-duplicates? xs)
+            (alpha? e0))]
+      [`(lambda (,(? not-seen-var? xs) ...) ,e0)
+       (and (no-duplicates? xs)
+            (alpha? e0))]
+      [`(lambda ,(? not-seen-var? x) ,e0)
+       (alpha? e0)]
+      [`(apply ,(? alpha?) ,(? alpha?)) #t]
+      [`(if ,(? alpha?) ,(? alpha?) ,(? alpha?)) #t]
+      [`(call/cc ,(? alpha?)) #t]
+      [(? var? x) #t]
+      [`(quote ,(? datum?)) #t]
+      [`(prim ,(? prim?) ,(? alpha?) ...) #t]
+      [`(apply-prim ,(? prim?) ,(? alpha?)) #t]
+      [`(,(? (and/c (not/c (lambda (x) (member x '(let lambda apply if call/cc quote prim quote-prim))))
+                    alpha?))
+         ,(? alpha?) ...) #t]
+      [else (pretty-print `(bad-alphatized ,e)) #f]))
   (and (ir-exp? e) (alpha? e)))
 
 
@@ -526,21 +526,21 @@
 (define (anf-exp? e)
   (define (a-exp? e)
     (match e
-           [`(lambda ,xs ,(? c-exp? e0)) #t]
-           [`',dat #t]
-           [(? symbol? x) #t]
-           [else #f]))
+      [`(lambda ,xs ,(? c-exp? e0)) #t]
+      [`',dat #t]
+      [(? symbol? x) #t]
+      [else #f]))
   (define (c-exp? e)
     (match e
-           [`(let ([,(? symbol? x) ,(? c-exp? rhs)]) ,(? c-exp? e0)) #t]
-           [`(if ,(? a-exp? ae) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
-           [`(prim ,op ,(? a-exp? aes) ...) #t]
-           [`(apply-prim ,op ,(? a-exp? ae)) #t]
-           [`(call/cc ,(? a-exp? ae)) #t]
-           [`(apply ,(? a-exp? aes) ,(? a-exp? aes)) #t]
-           [`(,(? (and/c (not/c reserved?) a-exp?) aef) ,(? a-exp? aes) ...) #t]
-           [(? a-exp? e) #t]
-           [else (pretty-print `(bad-anf ,e)) #f]))
+      [`(let ([,(? symbol? x) ,(? c-exp? rhs)]) ,(? c-exp? e0)) #t]
+      [`(if ,(? a-exp? ae) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
+      [`(prim ,op ,(? a-exp? aes) ...) #t]
+      [`(apply-prim ,op ,(? a-exp? ae)) #t]
+      [`(call/cc ,(? a-exp? ae)) #t]
+      [`(apply ,(? a-exp? aes) ,(? a-exp? aes)) #t]
+      [`(,(? (and/c (not/c reserved?) a-exp?) aef) ,(? a-exp? aes) ...) #t]
+      [(? a-exp? e) #t]
+      [else (pretty-print `(bad-anf ,e)) #f]))
   (and (ir-exp? e) (c-exp? e)))
 
 
@@ -563,20 +563,20 @@
 (define (cps-exp? e)
   (define (a-exp? e)
     (match e
-           [`(lambda ,xs ,(? c-exp? e0)) #t]
-           [`',dat #t]
-           [(? symbol? x) #t]
-           [else (pretty-print `(bad-cps-ae ,e)) #f]))
+      [`(lambda ,xs ,(? c-exp? e0)) #t]
+      [`',dat #t]
+      [(? symbol? x) #t]
+      [else (pretty-print `(bad-cps-ae ,e)) #f]))
   (define (c-exp? e)
     (match e
-           [`(let ([,(? symbol? x) (prim ,op ,(? a-exp? aes) ...)]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) (apply-prim ,op ,(? a-exp? ae))]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) (lambda ,xs ,(? c-exp? lam-e))]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) ',dat]) ,(? c-exp? e0)) #t]
-           [`(if ,(? a-exp? ae) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
-           [`(apply ,(? a-exp? aes) ,(? a-exp? aes)) #t]
-           [`(,(? (and/c (not/c reserved?) a-exp?) aef) ,(? a-exp? aes) ...) #t]
-           [else (pretty-print `(bad-cps-e ,e)) #f]))
+      [`(let ([,(? symbol? x) (prim ,op ,(? a-exp? aes) ...)]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) (apply-prim ,op ,(? a-exp? ae))]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) (lambda ,xs ,(? c-exp? lam-e))]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) ',dat]) ,(? c-exp? e0)) #t]
+      [`(if ,(? a-exp? ae) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
+      [`(apply ,(? a-exp? aes) ,(? a-exp? aes)) #t]
+      [`(,(? (and/c (not/c reserved?) a-exp?) aef) ,(? a-exp? aes) ...) #t]
+      [else (pretty-print `(bad-cps-e ,e)) #f]))
   (and (anf-exp? e) (c-exp? e)))
 
 
@@ -591,25 +591,25 @@
 (define (proc-exp? e)
   (define (c-exp? e)
     (match e
-           [`(let ([,(? symbol? x) (make-closure ,(? symbol? xs) ...)]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) (env-ref ,(? symbol?) ,(? integer?))]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) (prim ,op ,(? symbol? xs) ...)]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) (apply-prim ,op ,(? symbol? y))]) ,(? c-exp? e0)) #t]
-           [`(let ([,(? symbol? x) ',dat]) ,(? c-exp? e0)) #t]
-           [`(if ,(? symbol? x) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
-           [`(clo-app ,(? symbol? f) ,(? symbol? xs) ...) #t]
-           [else (pretty-print `(bad-proc-e ,e)) #f]))
+      [`(let ([,(? symbol? x) (make-closure ,(? symbol? xs) ...)]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) (env-ref ,(? symbol?) ,(? integer?))]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) (prim ,op ,(? symbol? xs) ...)]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) (apply-prim ,op ,(? symbol? y))]) ,(? c-exp? e0)) #t]
+      [`(let ([,(? symbol? x) ',dat]) ,(? c-exp? e0)) #t]
+      [`(if ,(? symbol? x) ,(? c-exp? e0) ,(? c-exp? e1)) #t]
+      [`(clo-app ,(? symbol? f) ,(? symbol? xs) ...) #t]
+      [else (pretty-print `(bad-proc-e ,e)) #f]))
   (match e
-         [`((proc (,(? symbol? xs) ...) ,(? c-exp? e)) ...) #t]
-         [else (pretty-print `(bad-proc ,e)) #f]))
+    [`((proc (,(? symbol? xs) ...) ,(? c-exp? e)) ...) #t]
+    [else (pretty-print `(bad-proc ,e)) #f]))
 
 (define recent-header #f)
 (define (eval-llvm llvm-str)
   ; freshly compile the header / runtime library if not already
   (when (or (not (file-exists? "header.ll")) (not recent-header))
-        (set! recent-header #t)
-        (system (string-append clang++-path " header.cpp " " -I " gc-include-path " -S -emit-llvm -o header.ll")))
-        ;(system (string-append clang++-path " header.cpp " " -S -emit-llvm -o header.ll")))
+    (set! recent-header #t)
+    (system (string-append clang++-path " header.cpp " " -I " gc-include-path " -S -emit-llvm -o header.ll")))
+  ;(system (string-append clang++-path " header.cpp " " -S -emit-llvm -o header.ll")))
   (define header-str (read-string 299999 (open-input-file "header.ll" #:mode 'text)))
   (define llvm (string-append header-str "\n\n;;;;;;\n\n" llvm-str))
   (display llvm (open-output-file "combined.ll" #:exists 'replace))
@@ -657,7 +657,7 @@
       #t
       (begin
         (display (format "Test-proc->llvm: two different values (~a and ~a) before and after closure conversion.\n"
-                             val val0))
+                         val val0))
         #f)))
 
 
@@ -669,42 +669,43 @@
     (match e [`(match ,e0 ,clauses ... (,pat0 ,es ...))
               #:when (not (equal? pat0 'else))
               (rewrite-match `(match ,e0 ,@clauses (,pat0 ,@es) (else (raise "no match"))))]
-             [`(,e0 . ,es) (cons (rewrite-match e0) (rewrite-match es))]
-             [else e]))
-  (with-handlers ([exn:fail? (lambda (x) (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print e) (error 'eval-fail))])
-                 (parameterize ([current-namespace (make-base-namespace)])
-                               (namespace-require 'rnrs)
-                               (namespace-require 'racket)
-                               (namespace-require 'srfi/34)
-                               (eval (compile
-                                      `(call/cc (lambda (exit+)
-                                                  (define (halt x) (exit+ x))
-                                                  (define (prim op . args) (apply op args))
-                                                  (define (apply-prim op args) (apply op args))
-                                                  ,(rewrite-match e))))))))
+      [`(,e0 . ,es) (cons (rewrite-match e0) (rewrite-match es))]
+      [else e]))
+  (with-handlers ([exn:fail:contract:divide-by-zero? (lambda (x) "fatal error: division by zero")]
+                  [exn:fail? (lambda (x) (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print e) (error 'eval-fail))])
+    (parameterize ([current-namespace (make-base-namespace)])
+      (namespace-require 'rnrs)
+      (namespace-require 'racket)
+      (namespace-require 'srfi/34)
+      (eval (compile
+             `(call/cc (lambda (exit+)
+                         (define (halt x) (exit+ x))
+                         (define (prim op . args) (apply op args))
+                         (define (apply-prim op args) (apply op args))
+                         ,(rewrite-match e))))))))
 
 
 
 (define (racket-proc-eval procs)
   (with-handlers ([exn:fail? (lambda (x) (begin (pretty-print "Evaluation failed:") (pretty-print x) (pretty-print procs) (error 'eval-fail)))])
-                 (parameterize ([current-namespace (make-base-namespace)])
-                               (namespace-require 'rnrs)
-                               (namespace-require 'racket)
-                               (namespace-require 'srfi/34)
-                               (eval (compile
-                                      `(begin
-                                        (call/cc (lambda (exit+)
-                                                    (define (halt x) (exit+ x))
-                                                    (define datum (lambda (d) d))
-                                                    (define (prim op . args) (apply op args))
-                                                    (define (apply-prim op args) (apply op args))
-                                                    (define (procedure? p) (and (vector? p)
-                                                                                (equal? '%clo (vector-ref p (- (vector-length p) 1)))))
-                                                    (define (make-closure . args) (list->vector (append args '(%clo))))
-                                                    (define env-ref vector-ref)
-                                                    (define (clo-app f . vs) (apply (vector-ref f 0) (cons f vs)))
-                                                    ,@(map (match-lambda [`(proc (,xs ...) ,bdy) `(define ,xs ,bdy)]) procs)
-                                                    (main)))))))))
+    (parameterize ([current-namespace (make-base-namespace)])
+      (namespace-require 'rnrs)
+      (namespace-require 'racket)
+      (namespace-require 'srfi/34)
+      (eval (compile
+             `(begin
+                (call/cc (lambda (exit+)
+                           (define (halt x) (exit+ x))
+                           (define datum (lambda (d) d))
+                           (define (prim op . args) (apply op args))
+                           (define (apply-prim op args) (apply op args))
+                           (define (procedure? p) (and (vector? p)
+                                                       (equal? '%clo (vector-ref p (- (vector-length p) 1)))))
+                           (define (make-closure . args) (list->vector (append args '(%clo))))
+                           (define env-ref vector-ref)
+                           (define (clo-app f . vs) (apply (vector-ref f 0) (cons f vs)))
+                           ,@(map (match-lambda [`(proc (,xs ...) ,bdy) `(define ,xs ,bdy)]) procs)
+                           (main)))))))))
 
 
                        

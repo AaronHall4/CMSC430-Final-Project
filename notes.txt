@@ -1,0 +1,3 @@
+To catch exceptions in eval-top-level, I added appropriate cases to the with-handler in racket-compile-eval
+Runtime errors:
+    - Division by zero. Fixed by adding a check in header.cpp and halting with an error message if b = 0.

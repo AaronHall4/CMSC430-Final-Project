@@ -4,6 +4,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "stdint.h"
+#include "string.h"
 
 #define USE_GC 1     // Comment this line to disable garbage collection.
 
@@ -672,6 +673,13 @@ u64 prim__47(u64 a, u64 b) // /
 {
     ASSERT_TAG(a, INT_TAG, "(prim / a b); a is not an integer")
     ASSERT_TAG(b, INT_TAG, "(prim / a b); b is not an integer")
+
+    if (DECODE_INT(b) == 0) {
+        const char *errstrconst = "fatal error: division by zero";
+        char *errstr = (char *) calloc(1, strlen(errstrconst) + 1);    // Using calloc instead of GC_MALLOC here because it's simpler and
+        strcpy(errstr, errstrconst);                                   // the program will terminate anyway.
+        prim_halt(ENCODE_STR(errstr));
+    }
     
     return ENCODE_INT(DECODE_INT(a) / DECODE_INT(b));
 }
