@@ -43,8 +43,8 @@
         "clang++")))
 
 (define prims-list '(= > < <= >= + - * / 
-                     cons? null? cons car cdr list first second third fourth fifth list
-                     length list-tail drop take member memv map append foldl foldr
+                     cons? null? cons car cdr list first second third fourth fifth last
+                     length list-tail drop drop-right take member memv map append foldl foldr
                      vector? vector make-vector vector-ref vector-set! vector-length
                      set set->list list->set set-add set-union set-count set-first set-rest set-remove
                      hash hash-ref hash-set hash-count hash-keys hash-has-key? hash?
@@ -313,12 +313,12 @@
             `(%map1 ,@(map T (list e0 e1)))]
 
            [`(prim ,op ,es ...)
-            #:when (member op '(drop memv / > >= list? drop-right length append last
-                                     map foldl foldr first second third fourth))
+            #:when (member op '(drop memv / > >= list? take drop length append last
+                                     map foldl foldr first second third fourth fifth))
             `(,(string->symbol (string-append "%" (symbol->string op))) ,@(map T es))]
            [`(apply-prim ,op ,e0)
-            #:when (member op '(drop memv / > >= list? drop-right length append last
-                                     map foldl foldr first second third fourth))
+            #:when (member op '(drop memv / > >= list? take drop length append last
+                                     map foldl foldr first second third fourth fifth))
             `(apply ,(string->symbol (string-append "%" (symbol->string op))) ,(T e0))]
                       
            [`(prim ,op ,es ...)
@@ -443,7 +443,8 @@
                  [%first (lambda (x) (prim car x))]
                  [%second (lambda (x) (prim car (prim cdr x)))]
                  [%third (lambda (x) (prim car (prim cdr (prim cdr x))))]
-                 [%fourth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr x)))))])
+                 [%fourth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr x)))))]
+                 [%fifth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr (prim cdr x))))))])
              ,(T ir-e)))))))
 
 
@@ -605,15 +606,15 @@
 (define recent-header #f)
 (define (eval-llvm llvm-str)
   ; freshly compile the header / runtime library if not already
-  (when (not recent-header)
+  (when (or (not (file-exists? "header.ll")) (not recent-header))
         (set! recent-header #t)
-        ;(system (string-append clang++-path " header.cpp " " -I " gc-include-path " -S -emit-llvm -o header.ll"))
-        (system (string-append clang++-path " header.cpp " " -S -emit-llvm -o header.ll")))
+        (system (string-append clang++-path " header.cpp " " -I " gc-include-path " -S -emit-llvm -o header.ll")))
+        ;(system (string-append clang++-path " header.cpp " " -S -emit-llvm -o header.ll")))
   (define header-str (read-string 299999 (open-input-file "header.ll" #:mode 'text)))
   (define llvm (string-append header-str "\n\n;;;;;;\n\n" llvm-str))
   (display llvm (open-output-file "combined.ll" #:exists 'replace))
-  ;(system (string-append clang++-path " combined.ll " libgc-path " -I " gc-include-path " -lpthread -o bin"))
-  (system (string-append clang++-path " combined.ll " " -o bin"))
+  (system (string-append clang++-path " combined.ll " libgc-path " -I " gc-include-path " -lpthread -o bin"))
+  ;(system (string-append clang++-path " combined.ll " " -o bin"))
   (match-define `(,out-port ,in-port ,id ,err-port ,callback) (process "./bin"))
   (define starttime (current-milliseconds))
   (let loop ()

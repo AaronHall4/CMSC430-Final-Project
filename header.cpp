@@ -1,20 +1,22 @@
 
 
-//#include "gc.h"    // Add back in and change tags if we want to use GC
+#include "gc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "stdint.h"
 
-#define CLO_TAG 0
-#define CONS_TAG 1
-#define INT_TAG 2
-#define STR_TAG 3
-#define SYM_TAG 4
-#define OTHER_TAG 6
-#define ENUM_TAG 7
+#define USE_GC 1     // Comment this line to disable garbage collection.
+
+#define GC_PTR_TAG 0
+#define INT_TAG 1
+#define STR_TAG 2
+#define SYM_TAG 3
+#define CLO_TAG 4
+
+#define GC_CONS_TAG 1
+#define GC_VECTOR_TAG 2
 
 
-#define VECTOR_OTHERTAG 1
 // Hashes, Sets, gen records, can all be added here
 
 
@@ -27,7 +29,6 @@
 
 #define MASK64 0xffffffffffffffff // useful for tagging related operations
 
-
 #define ASSERT_TAG(v,tag,msg) \
     if(((v)&7ULL) != (tag)) \
         fatal_err(msg);
@@ -36,12 +37,38 @@
     if(((u64)(v)) != (val))     \
         fatal_err(msg);
 
+#define ASSERT_GC_TAG(v,tag,msg) \
+    if((((u64)(v)&7ULL) != GC_PTR_TAG) || ((*((u64*) v)&7ULL) != (tag))) \
+        fatal_err(msg);
+
+#define ASSERT_GC_VALUE(v,val,msg) \
+    if((((u64)(v)&7ULL) != GC_PTR_TAG) || ((*((u64*) v)) != (val))) \
+        fatal_err(msg);
+
+#define GC_TAG_MATCH(v,tag) ((((u64)(v)&7ULL) == GC_PTR_TAG) && ((*((u64*) v)&7ULL) == (tag)))
+
+/*
+ * General tagging scheme:
+ *  - Raw ints, strings, and symbols are never allocated, so the tagging is normal.
+ *  - cons cells, vectors, and other such data structures are always allocated, so they
+ *    follow the GC_PTR tagging scheme.
+ *  - Anything else that is allocated (including dynamic strings, if I implement them) will
+ *    also follow the GC_PTR tagging scheme.
+ *
+ * GC_PTR tagging scheme:
+ *  - Pointers returned by GC_MALLOC (called via alloc) have the tag of all zeros, which, 
+ *    conversely, identifies a GC_PTR.
+ *  - The pointer itself is only a pointer. An application should request more memory than they
+ *    need and use the first i64 to identify the type of the data (and other metadata as desired).
+ *  - Calling alloc(m) returns a pointer to m bytes. The first i64 is used to identify the 
+ *    type of the data, and the remaining m bytes hold the actual data.
+ *
+ * There is no need for the OTHER tag anymore, since it has essentially been replaced by proper
+ * GC usage.
+ */
 
 #define DECODE_CLO(v) ((u64*)((v)&(7ULL^MASK64)))
 #define ENCODE_CLO(v) (((u64)(v)) | CLO_TAG)
-
-#define DECODE_CONS(v) ((u64*)((v)&(7ULL^MASK64)))
-#define ENCODE_CONS(v) (((u64)(v)) | CONS_TAG)
 
 #define DECODE_INT(v) ((s32)((u32)(((v)&(7ULL^MASK64)) >> 32)))
 #define ENCODE_INT(v) ((((u64)((u32)(v))) << 32) | INT_TAG)
@@ -51,9 +78,6 @@
 
 #define DECODE_SYM(v) ((char*)((v)&(7ULL^MASK64)))
 #define ENCODE_SYM(v) (((u64)(v)) | SYM_TAG)
-
-#define DECODE_OTHER(v) ((u64*)((v)&(7ULL^MASK64)))
-#define ENCODE_OTHER(v) (((u64)(v)) | OTHER_TAG)
 
 
 // some apply-prim macros for expecting 1 argument or 2 arguments
@@ -109,9 +133,11 @@ typedef int32_t s32;
 
 u64* alloc(const u64 m)
 {
-    return (u64*)(malloc(m));
-    //return new u64[m];
-    //return (u64*)GC_MALLOC(m);
+    #ifdef USE_GC
+        return (u64*) GC_MALLOC(m);
+    #else
+        return (u64*) malloc(m);
+    #endif
 }
 
 void fatal_err(const char* msg)
@@ -136,8 +162,8 @@ u64 expect_args0(u64 args)
 
 u64 expect_args1(u64 args)
 {
-    ASSERT_TAG(args, CONS_TAG, "Expected cons value (in expect_args1). Prim applied on an empty argument list.")
-    u64* p = DECODE_CONS(args);
+    ASSERT_GC_TAG(args, GC_CONS_TAG, "Expected cons value (in expect_args1). Prim applied on an empty argument list.")
+    u64* p = ((u64*) args) + 1;
     ASSERT_VALUE((p[1]), V_NULL, "Expected null value (in expect_args1). Prim can only take 1 argument.")
     return p[0];
 }
@@ -146,23 +172,25 @@ u64 expect_cons(u64 p, u64* rest)
 {
     // pass a pair value p and a pointer to a word *rest                          
     // verifiies (cons? p), returns the value (car p) and assigns *rest = (cdr p) 
-    ASSERT_TAG(p, CONS_TAG, "Expected a cons value. (expect_cons)")               
+    ASSERT_GC_TAG(p, GC_CONS_TAG, "Expected a cons value. (expect_cons)")               
 
-    u64* pp = DECODE_CONS(p);
+    u64* pp = ((u64*) p) + 1;
     *rest = pp[1];
     return pp[0];
 }
 
+/*
 u64 expect_other(u64 v, u64* rest)
 {
     // returns the runtime tag value
     // puts the untagged value at *rest
-    ASSERT_TAG(v, OTHER_TAG, "Expected a vector or special value. (expect_other)")
+    ASSERT_GC_TAG(v, OTHER_TAG, "Expected a vector or special value. (expect_other)")
     
     u64* p = DECODE_OTHER(v);
     *rest = p[1];
     return p[0];
 }
+*/
 
 
 /////// CONSTANTS
@@ -223,17 +251,14 @@ u64 prim_print_aux(u64 v)
 {
     if (v == V_NULL)
         printf("()");
+    else if (v == V_VOID)
+        printf("#<void>");
+    else if (v == V_TRUE)
+        printf("#t");
+    else if (v == V_FALSE)
+        printf("#f");
     else if ((v&7) == CLO_TAG)
         printf("#<procedure>");
-    else if ((v&7) == CONS_TAG)
-    {
-        u64* p = DECODE_CONS(v);
-        printf("(");
-        prim_print_aux(p[0]);
-        printf(" . ");
-        prim_print_aux(p[1]);
-        printf(")");
-    }
     else if ((v&7) == INT_TAG)
     {
         printf("%d", (int)((s32)(v >> 32)));
@@ -246,19 +271,31 @@ u64 prim_print_aux(u64 v)
     {   // needs to handle escaping to be correct
         printf("%s", DECODE_SYM(v));
     }
-    else if ((v&7) == OTHER_TAG
-             && (VECTOR_OTHERTAG == (((u64*)DECODE_OTHER(v))[0] & 7)))
+    else if ((v&7) == GC_PTR_TAG)
     {
-        printf("#(");
-        u64* vec = (u64*)DECODE_OTHER(v);
-        u64 len = vec[0] >> 3;
-        prim_print_aux(vec[1]);
-        for (u64 i = 2; i <= len; ++i)
+        u64 vinnertag = *((u64*) v) & 7;
+        if (vinnertag == GC_CONS_TAG)
         {
-            printf(",");
-            prim_print_aux(vec[i]);
+            u64* p = ((u64*) v) + 1;
+            printf("(");
+            prim_print_aux(p[0]);
+            printf(" . ");
+            prim_print_aux(p[1]);
+            printf(")");
         }
-        printf(")");
+        else if (vinnertag == GC_VECTOR_TAG)
+        {
+            printf("#(");
+            u64* vec = (u64*) v;
+            u64 len = vec[0] >> 3;
+            prim_print_aux(vec[1]);
+            for (u64 i = 2; i <= len; ++i)
+            {
+                printf(" ");
+                prim_print_aux(vec[i]);
+            }
+            printf(")");
+        }
     }
     else
         printf("(print.. v); unrecognized value %lu", v);
@@ -270,20 +307,17 @@ u64 prim_print(u64 v)
 {
     if (v == V_NULL)
         printf("'()");
+    else if (v == V_VOID)
+        printf("#<void>");
+    else if (v == V_TRUE)
+        printf("#t");
+    else if (v == V_FALSE)
+        printf("#f");
     else if ((v&7) == CLO_TAG)
         printf("#<procedure>");
-    else if ((v&7) == CONS_TAG)
-    {
-        u64* p = (u64*)(v&(7ULL^MASK64));
-        printf("'(");
-        prim_print_aux(p[0]);
-        printf(" . ");
-        prim_print_aux(p[1]);
-        printf(")");
-    }
     else if ((v&7) == INT_TAG)
     {
-        printf("%d", ((s32)(v >> 32)));
+        printf("%d", (int)((s32)(v >> 32)));
     }
     else if ((v&7) == STR_TAG)
     {   // needs to handle escaping to be correct
@@ -293,19 +327,31 @@ u64 prim_print(u64 v)
     {   // needs to handle escaping to be correct
         printf("'%s", DECODE_SYM(v));
     }
-    else if ((v&7) == OTHER_TAG
-             && (VECTOR_OTHERTAG == (((u64*)DECODE_OTHER(v))[0] & 7)))
+    else if ((v&7) == GC_PTR_TAG)
     {
-        printf("#(");
-        u64* vec = (u64*)DECODE_OTHER(v);
-        u64 len = vec[0] >> 3;
-        prim_print(vec[1]);
-        for (u64 i = 2; i <= len; ++i)
+        u64 vinnertag = *((u64*) v) & 7;
+        if (vinnertag == GC_CONS_TAG)
         {
-            printf(",");
-            prim_print(vec[i]);
+            u64* p = ((u64*) v) + 1;
+            printf("'(");
+            prim_print_aux(p[0]);
+            printf(" . ");
+            prim_print_aux(p[1]);
+            printf(")");
         }
-        printf(")");
+        else if (vinnertag == GC_VECTOR_TAG)
+        {
+            printf("#(");
+            u64* vec = (u64*) v;
+            u64 len = vec[0] >> 3;
+            prim_print(vec[1]);
+            for (u64 i = 2; i <= len; ++i)
+            {
+                printf(" ");
+                prim_print_aux(vec[i]);
+            }
+            printf(")");
+        }
     }
     else
         printf("(print v); unrecognized value %lu", v);
@@ -326,19 +372,26 @@ u64 prim_halt(u64 v) // halt
 
 u64 applyprim_vector(u64 lst)
 {
-    // pretty terrible, but works
     u64* buffer = (u64*)malloc(512*sizeof(u64));
     u64 l = 0;
-    while ((lst&7) == CONS_TAG && l < 512) 
-        buffer[l++] = expect_cons(lst, &lst);
+    while (l < 512) {
+        if (lst == 0ULL)
+            break;
+        else if (GC_TAG_MATCH(lst, GC_CONS_TAG)) {
+            u64* pp = ((u64*) lst) + 1;
+            buffer[l++] = pp[0];
+            lst = pp[1];
+        } else {
+            break;
+        }
+    }
     u64* mem = alloc((l + 1) * sizeof(u64));
-    mem[0] = (l << 3) | VECTOR_OTHERTAG;
+    mem[0] = (l << 3) | GC_VECTOR_TAG;
     for (u64 i = 0; i < l; ++i)
         mem[i+1] = buffer[i];
     delete [] buffer;
-    return ENCODE_OTHER(mem);
+    return (u64) mem;
 }
-
 
 
 u64 prim_make_45vector(u64 lenv, u64 iv)
@@ -347,10 +400,10 @@ u64 prim_make_45vector(u64 lenv, u64 iv)
     
     const u64 l = DECODE_INT(lenv);
     u64* vec = (u64*)alloc((l + 1) * sizeof(u64));
-    vec[0] = (l << 3) | VECTOR_OTHERTAG;
+    vec[0] = (l << 3) | GC_VECTOR_TAG;
     for (u64 i = 1; i <= l; ++i)
         vec[i] = iv;
-    return ENCODE_OTHER(vec);
+    return (u64) vec;
 }
 GEN_EXPECT2ARGLIST(applyprim_make_45vector, prim_make_45vector)
 
@@ -358,12 +411,9 @@ GEN_EXPECT2ARGLIST(applyprim_make_45vector, prim_make_45vector)
 u64 prim_vector_45ref(u64 v, u64 i)
 {
     ASSERT_TAG(i, INT_TAG, "second argument to vector-ref must be an integer")
-    ASSERT_TAG(v, OTHER_TAG, "first argument to vector-ref must be a vector")
+    ASSERT_GC_TAG(v, GC_VECTOR_TAG, "first argument to vector-ref must be a vector")
 
-    if ((((u64*)DECODE_OTHER(v))[0]&7) != VECTOR_OTHERTAG)
-        fatal_err("vector-ref not given a properly formed vector");
-
-    return ((u64*)DECODE_OTHER(v))[1+(DECODE_INT(i))];
+    return ((u64*) v)[1+(DECODE_INT(i))];
 }
 GEN_EXPECT2ARGLIST(applyprim_vector_45ref, prim_vector_45ref)
 
@@ -371,13 +421,9 @@ GEN_EXPECT2ARGLIST(applyprim_vector_45ref, prim_vector_45ref)
 u64 prim_vector_45set_33(u64 a, u64 i, u64 v)
 {
     ASSERT_TAG(i, INT_TAG, "second argument to vector-ref must be an integer")
-    ASSERT_TAG(a, OTHER_TAG, "first argument to vector-ref must be a vector")
+    ASSERT_GC_TAG(a, GC_VECTOR_TAG, "first argument to vector-ref must be a vector")
 
-    if ((((u64*)DECODE_OTHER(a))[0]&7) != VECTOR_OTHERTAG)
-        fatal_err("vector-ref not given a properly formed vector");
-
-        
-    ((u64*)(DECODE_OTHER(a)))[1+DECODE_INT(i)] = v;
+    ((u64*) a)[1+DECODE_INT(i)] = v;
         
     return V_VOID;
 }
@@ -385,19 +431,16 @@ GEN_EXPECT3ARGLIST(applyprim_vector_45set_33, prim_vector_45set_33)
 
 u64 prim_vector_45length(u64 a)
 {
-    ASSERT_TAG(a, OTHER_TAG, "first argument to vector-length must be a vector")
+    ASSERT_GC_TAG(a, GC_VECTOR_TAG, "first argument to vector-length must be a vector")
     
-    if ((((u64*)DECODE_OTHER(a))[0]&7) != VECTOR_OTHERTAG)
-        fatal_err("vector-length not given a properly formed vector");
-    
-    return ENCODE_INT(((u64*)DECODE_OTHER(a))[0] >> 3);
+    return ENCODE_INT(((u64*) a)[0] >> 3);
 }
 GEN_EXPECT1ARGLIST(applyprim_vector_45length, prim_vector_45length)
 
 u64 prim_vector_63(u64 a)
 {
-    if ((a & 7) == OTHER_TAG) {
-        if ((((u64*)DECODE_OTHER(a))[0]&7) == VECTOR_OTHERTAG)
+    if ((a & 7) == GC_PTR_TAG) {
+        if ((((u64*) a)[0] & 7) == GC_VECTOR_TAG)
             return V_TRUE;
         else
             return V_FALSE;
@@ -422,7 +465,7 @@ u64 prim_void()
 
 
 ///// eq?, eqv?, equal?
-
+///// TODO: Polish these
     
 u64 prim_eq_63(u64 a, u64 b)
 {
@@ -514,20 +557,25 @@ GEN_EXPECT1ARGLIST(applyprim_null_63, prim_null_63)
 
 u64 prim_cons_63(u64 p) // cons?
 {
-    if ((p&7) == CONS_TAG)
-        return V_TRUE;
-    else
+    if ((p & 7) == GC_PTR_TAG) {
+        if ((((u64*) p)[0] & 7) == GC_CONS_TAG)
+            return V_TRUE;
+        else
+            return V_FALSE;
+    } else {
         return V_FALSE;
+    }
 }
 GEN_EXPECT1ARGLIST(applyprim_cons_63, prim_cons_63)    
 
 
 u64 prim_cons(u64 a, u64 b)
 {
-    u64* p = alloc(2*sizeof(u64));
-    p[0] = a;
-    p[1] = b;
-    return ENCODE_CONS(p);
+    u64* p = alloc(3*sizeof(u64));
+    p[0] = GC_CONS_TAG;
+    p[1] = a;
+    p[2] = b;
+    return (u64) p;
 }
 GEN_EXPECT2ARGLIST(applyprim_cons, prim_cons)
 
@@ -571,15 +619,15 @@ u64 applyprim__43(u64 p)
         return ENCODE_INT(0);
     else
     {
-        ASSERT_TAG(p, CONS_TAG, "Tried to apply + on non list value.")
-        u64* pp = DECODE_CONS(p);
+        ASSERT_GC_TAG(p, GC_CONS_TAG, "Tried to apply + on non list value.")
+        u64* pp = ((u64*) p) + 1;
         return ENCODE_INT(DECODE_INT(pp[0]) + DECODE_INT(applyprim__43(pp[1])));
     }
 }
     
 u64 prim__45(u64 a, u64 b) // -
 {
-    ASSERT_TAG(a, INT_TAG, "(prim + a b); a is not an integer")
+    ASSERT_TAG(a, INT_TAG, "(prim - a b); a is not an integer")
     ASSERT_TAG(b, INT_TAG, "(prim - a b); b is not an integer")
     
     return ENCODE_INT(DECODE_INT(a) - DECODE_INT(b));
@@ -591,8 +639,8 @@ u64 applyprim__45(u64 p)
         return ENCODE_INT(0);
     else
     {
-        ASSERT_TAG(p, CONS_TAG, "Tried to apply + on non list value.")
-        u64* pp = DECODE_CONS(p);
+        ASSERT_GC_TAG(p, GC_CONS_TAG, "Tried to apply - on non list value.")
+        u64* pp = ((u64*) p) + 1;
         if (pp[1] == V_NULL)
             return ENCODE_INT(0 - DECODE_INT(pp[0]));
         else // ideally would be properly left-to-right
@@ -614,8 +662,8 @@ u64 applyprim__42(u64 p)
         return ENCODE_INT(1);
     else
     {
-        ASSERT_TAG(p, CONS_TAG, "Tried to apply + on non list value.")
-        u64* pp = DECODE_CONS(p);
+        ASSERT_GC_TAG(p, GC_CONS_TAG, "Tried to apply + on non list value.")
+        u64* pp = ((u64*) p) + 1;
         return ENCODE_INT(DECODE_INT(pp[0]) * DECODE_INT(applyprim__42(pp[1])));
     }
 }
@@ -633,7 +681,7 @@ u64 prim__61(u64 a, u64 b)  // =
     ASSERT_TAG(a, INT_TAG, "(prim = a b); a is not an integer")
     ASSERT_TAG(b, INT_TAG, "(prim = a b); b is not an integer")
         
-    if ((s32)((a&(7ULL^MASK64)) >> 32) == (s32)((b&(7ULL^MASK64)) >> 32))
+    if (DECODE_INT(a) == DECODE_INT(b))
         return V_TRUE;
     else
         return V_FALSE;
@@ -644,7 +692,7 @@ u64 prim__60(u64 a, u64 b) // <
     ASSERT_TAG(a, INT_TAG, "(prim < a b); a is not an integer")
     ASSERT_TAG(b, INT_TAG, "(prim < a b); b is not an integer")
     
-    if ((s32)((a&(7ULL^MASK64)) >> 32) < (s32)((b&(7ULL^MASK64)) >> 32))
+    if (DECODE_INT(a) < DECODE_INT(b))
         return V_TRUE;
     else
         return V_FALSE;
@@ -655,7 +703,7 @@ u64 prim__60_61(u64 a, u64 b) // <=
     ASSERT_TAG(a, INT_TAG, "(prim <= a b); a is not an integer")
     ASSERT_TAG(b, INT_TAG, "(prim <= a b); b is not an integer")
         
-    if ((s32)((a&(7ULL^MASK64)) >> 32) <= (s32)((b&(7ULL^MASK64)) >> 32))
+    if (DECODE_INT(a) <= DECODE_INT(b))
         return V_TRUE;
     else
         return V_FALSE;

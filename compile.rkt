@@ -40,13 +40,13 @@
 (define recent-header #f)
 (define (compile-to-binary prog progname [save-llvm #f])
   (define prog-llvm (compile-to-llvm prog))
-  (when (not recent-header)
+  (when (or (not (file-exists? "header.ll")) (not recent-header))
     (set! recent-header #t)
-    (system (string-append clang++-path " header.cpp " " -S -emit-llvm -o header.ll")))
+    (system (string-append clang++-path " header.cpp " " -I " gc-include-path " -S -emit-llvm -o header.ll")))
   (define header-llvm (read-string 1000000 (open-input-file "header.ll" #:mode 'text)))
   (define combined-llvm (string-append header-llvm "\n\n;;;;;;\n\n" prog-llvm))
   (display combined-llvm (open-output-file (string-append progname ".ll") #:exists 'replace))
-  (system (string-append clang++-path " " progname ".ll -o " progname))
+  (system (string-append clang++-path " " progname ".ll " libgc-path " -I " gc-include-path " -lpthread -o " progname))
   (unless save-llvm
     (delete-file (string-append progname ".ll"))))
 
@@ -58,6 +58,6 @@
   (if (equal? tl-val llvm-val)
       #t
       (begin
-        (display (format "test-compiler: two different values (~a and ~a) before and after closure conversion.\n"
+        (display (format "test-compiler: two different values (~a and ~a) before and after compilation.\n"
                          tl-val llvm-val))
         #f)))
