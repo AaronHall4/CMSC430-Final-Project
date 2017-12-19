@@ -312,23 +312,9 @@
      `(quote #f)]
 
     [`(apply ,e0 ,e1)
-     (define e0+ (top-level e0))
-     (define e1+ (top-level e1))
-     (if (prim? e0+)
-         `(apply ,e0+ ,e1+)
-         `(let ([e0 ,e0+])
-            (if (procedure? e0)
-                (apply e0 ,e1+)
-                (halt '"fatal error: cannot apply non-procedure value"))))]
+     `(apply ,(top-level e0) ,(top-level e1))]
     [`(,e0 ,e1s ...)
-     (define e0+ (top-level e0))
-     (define e1s+ (map top-level e1s))
-     (if (prim? e0+)
-         `(,e0+ ,@e1s+)
-         `(let ([e0 ,e0+])
-            (if (procedure? e0)
-                (e0 ,@e1s+)
-                (halt '"fatal error: cannot apply non-procedure value"))))]))
+     `(,(top-level e0) ,@(map top-level e1s))]))
 
 ; I, Aaron Hall, pledge on my honor that I have not given or received any
 ; unauthorized assistance on this assignment.

@@ -12,6 +12,8 @@
          closure-convert
          proc->llvm)
 
+; The tag used to identify closures. Must match with the corresponding value in header.cpp.
+(define GC_CLO_TAG 3)
 
 ; Whether to optimize vararg conversion using static analysis (0-cfa) results
 (define optimize-varargs #t)
@@ -71,7 +73,7 @@
       `(let ([,xf (lambda ,xs ,ebody)])
          (apply ,x ,xf)))]
     [`(apply ',dat ,ae)
-     (pretty-print '(warning: applying datum))
+     ;(pretty-print '(warning: applying datum))
      `',dat]
     [`(apply ,(? symbol? x) ',dat)
      (define xd (gensym 'datum))
@@ -452,14 +454,15 @@
        (define n (match (car (filter (match-lambda [`(proc (,f . ,_) . ,_) (eq? f lamx)]) procs))
                    [`(proc (,lamx ,ys ...) . ,_) (length ys)]))
        (define f (gensym 'f))
+       (define tagptr (gensym 'tagptr))
        (apply string-append
               `(,(comment-line
-                  "  %" (s-> cptr) " = call i64* @alloc(i64 " (number->string (* (+ (length xs) 1) 8)) ")"
+                  "  %" (s-> cptr) " = call i64* @alloc(i64 " (number->string (* (+ (length xs) 2) 8)) ")"
                   "malloc")
                 ,@(map (lambda (iptr n)
                          (comment-line
-                          "  %" (s-> iptr) " = getelementptr inbounds i64, i64* %" (s-> cptr) ", i64 " (number->string n)
-                          (string-append "&" (s-> iptr) "[" (number->string n) "]")))
+                          "  %" (s-> iptr) " = getelementptr inbounds i64, i64* %" (s-> cptr) ", i64 " (number->string (+ 1 n))
+                          (string-append "&" (s-> iptr) "[" (number->string (+ 1 n)) "]")))
                        eptrs
                        (cdr (range (+ 1 (length xs)))))
                 ,@(map (lambda (x iptr)
@@ -469,8 +472,8 @@
                        xs
                        eptrs)
                 ,(comment-line
-                  "  %" (s-> fptrptr) " = getelementptr inbounds i64, i64* %" (s-> cptr) ", i64 0"
-                  (string-append "&" (s-> cptr) "[0]"))
+                  "  %" (s-> fptrptr) " = getelementptr inbounds i64, i64* %" (s-> cptr) ", i64 1"
+                  (string-append "&" (s-> cptr) "[1]"))
                 ,(comment-line 
                   "  %" (s-> f) " = ptrtoint void(i64"
                   (foldr string-append "" (map (lambda (_) ",i64")
@@ -480,6 +483,12 @@
                 ,(comment-line
                   "  store i64 %" (s-> f) ", i64* %" (s-> fptrptr)
                   "store fptr")
+                ,(comment-line
+                  "  %" (s-> tagptr) " = getelementptr inbounds i64, i64* %" (s-> cptr) ", i64 0"
+                  (string-append "&" (s-> cptr) "[0]"))
+                ,(comment-line
+                  "  store i64 " (number->string GC_CLO_TAG) ", i64* %" (s-> tagptr)
+                  "store closure tag")
                 ,(comment-line
                   "  %" (s-> x) " = ptrtoint i64* %" (s-> cptr) " to i64"
                   "closure cast; i64* -> i64")
@@ -492,8 +501,8 @@
                   "  %" (s-> yptr) " = inttoptr i64 %" (s-> y) " to i64*"
                   "closure/env cast; i64 -> i64*")
                 ,(comment-line
-                  "  %" (s-> iptr) " = getelementptr inbounds i64, i64* %" (s-> yptr) ", i64 " (number->string n)
-                  (string-append "&" (s-> yptr) "[" (number->string n) "]"))
+                  "  %" (s-> iptr) " = getelementptr inbounds i64, i64* %" (s-> yptr) ", i64 " (number->string (+ n 1))
+                  (string-append "&" (s-> yptr) "[" (number->string (+ n 1)) "]"))
                 ,(comment-line
                   "  %" (s-> x) " = load i64, i64* %" (s-> iptr) ", align 8"
                   (string-append "load; *" (s-> iptr)))
@@ -548,13 +557,17 @@
        (define i0ptr (gensym 'i0ptr))
        (define fptr (gensym 'fptr))
        (define f (gensym 'f))
+       (define checkproc (gensym 'checkproc))
        (apply string-append
               `(,(comment-line
+                  "  call void @assert_is_clo(i64 %" (s-> fx) ")"
+                  (string-append "ensure " (s-> fx) " is valid closure"))
+                ,(comment-line
                   "  %" (s-> cloptr) " = inttoptr i64 %" (s-> fx) " to i64*"
                   "closure/env cast; i64 -> i64*")
                 ,(comment-line
-                  "  %" (s-> i0ptr) " = getelementptr inbounds i64, i64* %" (s-> cloptr) ", i64 0"
-                  (string-append "&" (s-> cloptr) "[0]"))
+                  "  %" (s-> i0ptr) " = getelementptr inbounds i64, i64* %" (s-> cloptr) ", i64 1"
+                  (string-append "&" (s-> cloptr) "[1]"))
                 ,(comment-line
                   "  %" (s-> f) " = load i64, i64* %" (s-> i0ptr) ", align 8"
                   (string-append "load; *" (s-> i0ptr)))

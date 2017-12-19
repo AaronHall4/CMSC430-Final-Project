@@ -3,5 +3,5 @@ Runtime errors:
     - Division by zero. Fixed by adding a check in header.cpp and halting with an error message if b = 0.
     - Memory cap. Fixed in header.cpp by keeping track of the amount of memory allocated and terminating if it 
       goes over the 256 MB limit.
-    - Applying non-function value. Fixed in top-level.rkt by surrounding every function application with a check 
-      to make sure that the first value is actually a procedure.
+    - Applying non-function value. Wrote a assert_is_clo() function that ensures that an object is a closure
+      before calling the function associated with it.

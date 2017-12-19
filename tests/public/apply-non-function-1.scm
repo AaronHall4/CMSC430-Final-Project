@@ -1,1 +1,2 @@
-(apply 1 (list 2 3))
+(define a 1)
+(apply a (list 2 3))

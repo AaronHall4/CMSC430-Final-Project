@@ -13,10 +13,10 @@
 #define INT_TAG 1
 #define STR_TAG 2
 #define SYM_TAG 3
-#define CLO_TAG 4
 
 #define GC_CONS_TAG 1
 #define GC_VECTOR_TAG 2
+#define GC_CLO_TAG 3
 
 
 // Hashes, Sets, gen records, can all be added here
@@ -69,8 +69,6 @@
  * GC usage.
  */
 
-#define DECODE_CLO(v) ((u64*)((v)&(7ULL^MASK64)))
-#define ENCODE_CLO(v) (((u64)(v)) | CLO_TAG)
 
 #define DECODE_INT(v) ((s32)((u32)(((v)&(7ULL^MASK64)) >> 32)))
 #define ENCODE_INT(v) ((((u64)((u32)(v))) << 32) | INT_TAG)
@@ -268,8 +266,6 @@ u64 prim_print_aux(u64 v)
         printf("#t");
     else if (v == V_FALSE)
         printf("#f");
-    else if ((v&7) == CLO_TAG)
-        printf("#<procedure>");
     else if ((v&7) == INT_TAG)
     {
         printf("%d", (int)((s32)(v >> 32)));
@@ -307,6 +303,10 @@ u64 prim_print_aux(u64 v)
             }
             printf(")");
         }
+        else if (vinnertag == GC_CLO_TAG)
+        {
+            printf("#<procedure>");
+        }
     }
     else
         printf("(print.. v); unrecognized value %lu", v);
@@ -324,8 +324,6 @@ u64 prim_print(u64 v)
         printf("#t");
     else if (v == V_FALSE)
         printf("#f");
-    else if ((v&7) == CLO_TAG)
-        printf("#<procedure>");
     else if ((v&7) == INT_TAG)
     {
         printf("%d", (int)((s32)(v >> 32)));
@@ -362,6 +360,10 @@ u64 prim_print(u64 v)
                 prim_print_aux(vec[i]);
             }
             printf(")");
+        }
+        else if (vinnertag == GC_CLO_TAG)
+        {
+            printf("#<procedure>");
         }
     }
     else
@@ -545,12 +547,30 @@ GEN_EXPECT1ARGLIST(applyprim_void_63, prim_void_63)
 
 u64 prim_procedure_63(u64 a)
 {
-    if ((a&7) == CLO_TAG)
-        return V_TRUE;
-    else
+    if ((a & 7) == GC_PTR_TAG) {
+        if ((((u64*) a)[0] & 7) == GC_CLO_TAG)
+            return V_TRUE;
+        else
+            return V_FALSE;
+    } else {
         return V_FALSE;
+    }
 }
 GEN_EXPECT1ARGLIST(applyprim_procedure_63, prim_procedure_63)
+
+
+/*
+ * Terminate if the argument is not a closure. Ensures that we only
+ * apply functions.
+ */
+void assert_is_clo(u64 a) {
+    if (((a & 7) != GC_PTR_TAG) || ((((u64*) a)[0] & 7) != GC_CLO_TAG)) {
+        const char *errstrconst = "fatal error: cannot apply non-procedure value";
+        char *errstr = (char *) calloc(1, strlen(errstrconst) + 1);    // Using calloc instead of GC_MALLOC here because it's simpler and
+        strcpy(errstr, errstrconst);                                   // the program will terminate anyway.
+        prim_halt(ENCODE_STR(errstr));
+    }
+}
 
 
 ///// null?, cons?, cons, car, cdr
