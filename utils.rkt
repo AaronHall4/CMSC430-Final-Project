@@ -48,13 +48,13 @@
 
 (define prims-list '(= > < <= >= + - * / 
                        cons? null? cons car cdr list first second third fourth fifth last
-                       length list-tail drop drop-right take member memv map append foldl foldr
+                       length drop list-tail drop-right take member memv map append foldl foldr
                        vector? vector make-vector vector-ref vector-set! vector-length
                        set set->list list->set set-add set-union set-count set-first set-rest set-remove
                        hash hash-ref hash-set hash-count hash-keys hash-has-key? hash?
-                       list? void? promise? procedure? number? integer?
-                       error void print display write exit halt
-                       eq? eqv? equal? not))
+                       list? void? promise? procedure? integer? number? void print halt 
+                       eq? eqv? equal? not
+                       error display write exit))
 (define ok-set (list->set (string->list "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789$")))
 (define (c-name s)
   (foldr string-append
@@ -320,12 +320,14 @@
        `(%map1 ,@(map T (list e0 e1)))]
 
       [`(prim ,op ,es ...)
-       #:when (member op '(drop memv / > >= list? take drop length append last
-                                map foldl foldr first second third fourth fifth))
+       #:when (member op '(drop memv / > >= list? take list-tail drop drop-right length append
+                                last member map foldl foldr first second third fourth fifth
+                                hash))
        `(,(string->symbol (string-append "%" (symbol->string op))) ,@(map T es))]
       [`(apply-prim ,op ,e0)
-       #:when (member op '(drop memv / > >= list? take drop length append last
-                                map foldl foldr first second third fourth fifth))
+       #:when (member op '(drop memv / > >= list? take list-tail drop drop-right length append
+                                last member map foldl foldr first second third fourth fifth
+                                hash))
        `(apply ,(string->symbol (string-append "%" (symbol->string op))) ,(T e0))]
                       
       [`(prim ,op ,es ...)
@@ -390,7 +392,19 @@
                                           (prim cons
                                                 (apply f (%drop-right fargs '1))
                                                 (%last fargs)))
-                                        (prim cons '() lsts)))))])
+                                        (prim cons '() lsts)))))]
+               #;[%hash-aux
+                (Ycmb
+                 (lambda (hash-aux)
+                   (lambda args
+                     (let ([h (prim car args)]
+                           [rest (prim car (prim cdr args))])
+                       (if (prim null? (prim cdr rest))
+                           h
+                           (let ([k (prim car rest)]
+                                 [v (prim car (prim cdr rest))]
+                                 [rest+ (prim cdr (prim cdr rest))])
+                             (hash-aux (prim hash-set h k v) rest+)))))))])
            (let ([%foldl
                   (Ycmb
                    (lambda (%foldl)
@@ -426,6 +440,14 @@
                                 (let ([_0 (set! a (prim cdr a))])
                                   (cc cc))) 
                               '#f))))]
+                 [%list-tail
+                  (lambda (lst n)
+                    (let ([cc (call/cc (lambda (u) (u u)))])
+                      (if (prim = '0 n)
+                          lst
+                          (let ([_0 (set! lst (prim cdr lst))]
+                                [_1 (set! n (prim - n '1))])
+                            (cc cc)))))]
                  [%drop
                   (lambda (lst n)
                     (let ([cc (call/cc (lambda (u) (u u)))])
@@ -434,6 +456,27 @@
                           (let ([_0 (set! lst (prim cdr lst))]
                                 [_1 (set! n (prim - n '1))])
                             (cc cc)))))]
+                 [%drop-right
+                  (Ycmb
+                   (lambda (drop-right)
+                     (lambda args
+                       (let ([lst (prim car args)]
+                             [n (prim car (prim cdr args))])
+                         (if (prim = '0 n)
+                             '()
+                             (prim cons (prim car lst) (drop-right (prim cdr lst)
+                                                                   (prim - n '1))))))))]
+                 [%member
+                  (Ycmb
+                   (lambda (member)
+                     (lambda args
+                       (let ([v (prim car args)]
+                             [lst (prim car (prim cdr args))])
+                         (if (prim null? lst)
+                             '#f
+                             (if (prim equal? v (prim car lst))
+                                 lst
+                                 (member v (prim cdr lst))))))))]
                  [%memv
                   (lambda (v lst)
                     (let ([cc (call/cc (lambda (u) (u u)))])
@@ -451,7 +494,12 @@
                  [%second (lambda (x) (prim car (prim cdr x)))]
                  [%third (lambda (x) (prim car (prim cdr (prim cdr x))))]
                  [%fourth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr x)))))]
-                 [%fifth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr (prim cdr x))))))])
+                 [%fifth (lambda (x) (prim car (prim cdr (prim cdr (prim cdr (prim cdr x))))))]
+                 #;[%hash
+                  (Ycmb
+                   (lambda (hash)
+                     (lambda args
+                       (%hash-aux (prim hash) args))))])
              ,(T ir-e)))))))
 
 

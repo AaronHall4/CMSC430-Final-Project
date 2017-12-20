@@ -6,6 +6,11 @@
 #include "stdint.h"
 #include "string.h"
 
+/*
+#include "compat.h"
+#include "hamt.h"
+*/
+
 #define USE_GC 1            // Comment this line to disable garbage collection.
 #define MEM_CAP 268435456   // Memory cap of 256 MB.
 
@@ -17,6 +22,7 @@
 #define GC_CONS_TAG 1
 #define GC_VECTOR_TAG 2
 #define GC_CLO_TAG 3
+#define GC_HASH_TAG 4
 
 
 // Hashes, Sets, gen records, can all be added here
@@ -303,6 +309,10 @@ u64 prim_print_aux(u64 v)
             }
             printf(")");
         }
+        else if (vinnertag == GC_HASH_TAG)
+        {
+            printf("#<hash>");
+        }
         else if (vinnertag == GC_CLO_TAG)
         {
             printf("#<procedure>");
@@ -360,6 +370,10 @@ u64 prim_print(u64 v)
                 prim_print_aux(vec[i]);
             }
             printf(")");
+        }
+        else if (vinnertag == GC_HASH_TAG)
+        {
+            printf("#<hash>");
         }
         else if (vinnertag == GC_CLO_TAG)
         {
@@ -757,9 +771,37 @@ u64 prim_not(u64 a)
 GEN_EXPECT1ARGLIST(applyprim_not, prim_not)
 
 
+/*
+// Hashes
 
+u64 prim_hash() {
+    // Create an empty hash.
+    hamt<u64,u64> *hptr = GC_MALLOC(sizeof(hamt<u64,u64>));
+    *hptr = hamt<u64,u64>();
+
+    // Tag the pointer appropriately and return the result.
+    u64 *res = alloc(2*sizeof(u64));
+    res[0] = GC_HASH_TAG;
+    res[1] = hptr;
+    return (u64) res;
 }
 
+u64 prim_hash_45set(u64 h, u64 k, u64 v) {
+    ASSERT_GC_TAG(h, GC_HASH_TAG, "(prim hash-set h k v); h is not a hash")
 
+    u64* hptr = ((u64 *) h);
+    hamt<u64,u64> *hm = (hamt<u64,u64> *) hptr[1];
+    u64 *kptr = alloc(sizeof(u64));
+    *kptr = k;
+    u64 *vptr = alloc(sizeof(u64));
+    *vptr = k;
+    hamt<u64,u64> *new_hm = hm->insert(kptr, vptr);
 
+    u64 *res = alloc(2*sizeof(u64));
+    res[0] = GC_HASH_TAG;
+    res[1] = new_hm;
+    return (u64) res;
+}
+*/
 
+}

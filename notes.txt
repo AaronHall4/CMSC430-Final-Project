@@ -1,9 +1,0 @@
-To catch exceptions in eval-top-level, I added appropriate cases to the with-handler in racket-compile-eval
-Runtime errors:
-    - Division by zero. Fixed by adding a check in header.cpp and halting with an error message if b = 0.
-    - Memory cap. Fixed in header.cpp by keeping track of the amount of memory allocated and terminating if it 
-      goes over the 256 MB limit.
-    - Applying non-function value. Wrote a assert_is_clo() function that ensures that an object is a closure
-      before calling the function associated with it.
-    - Uncaught runtime exception. Surrounded the output of eval-top-level with a guard that prints an error message 
-      if an uncaught exception is raised.
